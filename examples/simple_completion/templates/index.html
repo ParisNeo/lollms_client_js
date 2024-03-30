@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LoLLMs Chat App</title>
+  <script src="/static/lollms_client_js.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f0f0f0;
+      margin: 0;
+      padding: 0;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-top: 20px;
+    }
+
+    .chat-container {
+      width: 80%;
+      max-width: 800px;
+      margin: 20px auto;
+      background-color: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      padding: 10px;
+      height: 600px;
+      overflow-y: scroll;
+    }
+
+    .chat-message {
+      padding: 10px 15px;
+      margin-bottom: 10px;
+      border-radius: 20px;
+      max-width: 70%;
+      word-wrap: break-word;
+      font-size: 14px;
+    }
+
+    .user-message {
+      background-color: #e6e6e6;
+      color: #333;
+      margin-left: auto;
+    }
+
+    .ai-message {
+      background-color: #007bff;
+      color: #fff;
+      margin-right: auto;
+    }
+
+    #promptInput {
+      width: 100%;
+      padding: 12px 20px;
+      margin-top: 10px;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 20px;
+      font-size: 16px;
+    }
+
+    button {
+      background-color: #007bff;
+      color: #fff;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      margin-top: 10px;
+      font-size: 16px;
+    }
+
+    button:hover {
+      background-color: #0069d9;
+    }
+    .input-container {
+      display: flex;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    #promptInput {
+      flex-grow: 1;
+      margin-right: 10px;
+    }
+
+    .options {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    .options button {
+      background-color: #007bff;
+      color: #fff;
+      padding: 8px 12px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .options button:hover {
+      background-color: #0069d9;
+    }
+
+  </style>
+</head>
+<body>
+  <h1>LoLLMs Chat App</h1>
+  <div class="chat-container" id="chatContainer"></div>
+  <div class="input-container">
+    <input type="text" id="promptInput" placeholder="Enter your message">
+    <button onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+  </div>
+  <div class="options">
+    <button onclick="saveDiscussion()"><i class="fas fa-save"></i> Save</button>
+    <button onclick="loadDiscussion()"><i class="fas fa-folder-open"></i> Load</button>
+  </div>
+
+  <script>
+    let full_prompt = "!@>system: This is a discussion between lollms the AI agent and a user.\nlollms is a very funny AI that makes everything turn to a joke.\nIt uses alot of emojies and have a great sense of humor.\n"
+    const chatContainer = document.getElementById('chatContainer');
+    const promptInput = document.getElementById('promptInput');
+
+    promptInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        sendMessage();
+        event.preventDefault(); // prevent the default form submission behavior
+      }
+    });
+    function sendMessage() {
+      const prompt = document.getElementById('promptInput').value;
+      addUserMessage(prompt);
+      full_prompt +="!@>user: "+prompt+"\n"+"!@>lollms: "
+      document.getElementById('promptInput').value = '';
+      console.log(full_prompt)
+      generateText(full_prompt)
+        .then(result => {
+          addAIMessage(result);
+          full_prompt +=result+"\n"
+        })
+        .catch(error => {
+          console.error(error);
+          addAIMessage(`Error: ${error.message}`);
+        });
+    }
+
+    function addUserMessage(message) {
+      const messageDiv = document.createElement('div');
+      messageDiv.classList.add('chat-message', 'user-message');
+      messageDiv.textContent = message;
+      chatContainer.appendChild(messageDiv);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function addAIMessage(message) {
+      const messageDiv = document.createElement('div');
+      messageDiv.classList.add('chat-message', 'ai-message');
+      messageDiv.textContent = message;
+      chatContainer.appendChild(messageDiv);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function saveDiscussion() {
+      const chatMessages = Array.from(chatContainer.children)
+        .map(child => child.textContent);
+      const discussion = chatMessages.join('\n');
+      const filename = prompt('Enter a filename to save the discussion:', 'discussion.txt');
+      const blob = new Blob([discussion], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function loadDiscussion() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.txt';
+      input.onchange = () => {
+        const file = input.files[0];
+        const reader = new FileReader();
+        reader.onload = () => {
+          const discussion = reader.result;
+          const messages = discussion.split('\n');
+          chatContainer.innerHTML = '';
+          messages.forEach((message, index) => {
+            const isUserMessage = index % 2 === 0;
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('chat-message', isUserMessage ? 'user-message' : 'ai-message');
+            messageDiv.textContent = message;
+            chatContainer.appendChild(messageDiv);
+          });
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    }
+
+  </script>
+</body>
+</html>
