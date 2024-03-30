@@ -17,6 +17,7 @@ async function generateText(prompt, host="http://localhost:9600", options = {}) 
       headers: {
         'Content-Type': 'application/json',
       },
+      mode: 'no-cors',
       body: JSON.stringify({
         prompt,
         ...defaultOptions,

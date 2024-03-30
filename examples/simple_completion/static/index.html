@@ -8,14 +8,14 @@
 <body>
   <h1>LoLLMs Client Example</h1>
   <input type="text" id="promptInput" placeholder="Enter your prompt">
-  <button onclick="generateText()">Generate Text</button>
+  <button onclick="generateTXT()">Generate Text</button>
   <pre id="outputContainer"></pre>
 
   <!-- Include the lollms_client_js.js file from GitHub -->
   <script src="https://raw.githubusercontent.com/ParisNeo/lollms_client_js/main/lollms_client_js.js"></script>
 
   <script>
-    function generateText() {
+    function generateTXT() {
       const prompt = document.getElementById('promptInput').value;
       generateText(prompt)
         .then(result => {
