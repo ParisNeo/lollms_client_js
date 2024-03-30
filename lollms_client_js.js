@@ -1,4 +1,4 @@
-async function generateText(prompt, options = {}) {
+async function generateText(prompt, host="http://localhost:9600", options = {}) {
     const defaultOptions = {
       modelName: null,
       personality: -1,
@@ -25,7 +25,7 @@ async function generateText(prompt, options = {}) {
     };
   
     try {
-      const response = await fetch('http://localhost:9600', requestOptions);
+      const response = await fetch(`${host}/lollms_generate`, requestOptions);
   
       if (response.ok) {
         const data = await response.text();

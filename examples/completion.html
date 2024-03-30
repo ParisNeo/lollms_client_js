@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LoLLMs Client Example</title>
+</head>
+<body>
+  <h1>LoLLMs Client Example</h1>
+  <input type="text" id="promptInput" placeholder="Enter your prompt">
+  <button onclick="generateText()">Generate Text</button>
+  <pre id="outputContainer"></pre>
+
+  <!-- Include the lollms_client_js.js file from GitHub -->
+  <script src="https://raw.githubusercontent.com/ParisNeo/lollms_client_js/main/lollms_client_js.js"></script>
+
+  <script>
+    function generateText() {
+      const prompt = document.getElementById('promptInput').value;
+      generateText(prompt)
+        .then(result => {
+          document.getElementById('outputContainer').textContent = result;
+        })
+        .catch(error => {
+          console.error(error);
+          document.getElementById('outputContainer').textContent = `Error: ${error.message}`;
+        });
+    }
+  </script>
+</body>
+</html>
