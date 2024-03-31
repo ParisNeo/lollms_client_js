@@ -1,4 +1,3 @@
-
 # lollms_client_js
 
 A client library for interacting with the LoLLMs (Lord Of Large Language Models) server. This library allows you to generate text using various parameters and configurations.
@@ -69,3 +68,5 @@ Contributions are welcome! If you find any issues or have suggestions for improv
 ## License
 
 This project is licensed under the [Apache-2.0 License](LICENSE).
+
+**Note**: Please ensure that the `lollms` server is configured to accept CORS requests from the server serving the `lollms_client_js` client. To do this, in the `lollms` personal folder on the server, find `configs/local_configs.yaml` and add the host address to `allowed_origins`. For example, if the origin is `https://mydomain.com:95620`, add it there. This is important to avoid access issues.
