@@ -120,6 +120,7 @@
   <div class="options">
     <button onclick="saveDiscussion()"><i class="fas fa-save"></i> Save</button>
     <button onclick="loadDiscussion()"><i class="fas fa-folder-open"></i> Load</button>
+    <button onclick="listAvailablePersonas()"><i class="fas fa-folder-open"></i> List personalities</button>
   </div>
 
   <script>
@@ -143,6 +144,17 @@
         .then(result => {
           addAIMessage(result);
           full_prompt +=result+"\n"
+        })
+        .catch(error => {
+          console.error(error);
+          addAIMessage(`Error: ${error.message}`);
+        });
+    }
+
+    function listAvailablePersonas() {
+      listMountedPersonalities()
+        .then(result => {
+          console.log(result)
         })
         .catch(error => {
           console.error(error);
@@ -203,7 +215,7 @@
       };
       input.click();
     }
-
+    
   </script>
 </body>
 </html>

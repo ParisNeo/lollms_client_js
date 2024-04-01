@@ -16,7 +16,24 @@ npm install lollms_client_js
 
 ## 📝 Usage
 
-Import the `generateText` function from the library and begin generating text with the desired parameters:
+The library provides functions to interact with the lollms server. On the server side, you need to install and load a certain number of personas, then you can use this library to generate text either using your own conditionning, or by summoning one of the personalities mounted on the server side.
+
+For this moment, two functions are exposed:
+- `generateText` : Generates text out of a prompt. 
+  If you specify a personality id (between 0 and nb mounted personalities) then you can directly send a user prompt. If you use -1 as personality id, then you need to format your prompt as you need.
+  You can use simple completion such as sending "Once apon a time " and the AI wil ldo the completion, or yo ucan use one of our advised prompt formats.
+  The advised prompt format is :
+  !@>system: here you place your conditioning
+  !@>user: here you put the user prompt 
+  !@>ai:
+  You can also use instruct mode:
+  !@>instruct: here you put the instruction
+  !@>process:
+  Lollms uses the !@> to detect role change, lollms also uses the model own eos token to detect end of sentense.
+- `listMountedPersonalities` : Lists all mounted personalities. The index of each personality can be used in generateText
+
+### generateText
+To use the generation without personality, import the `generateText` function from the library and begin generating text with the desired parameters:
 
 ```javascript
 import { generateText } from 'lollms_client_js';
@@ -44,6 +61,43 @@ The `generateText` function supports the following parameters:
 - `repeat_last_n` (number, optional, default: 40): Number of tokens to consider for repeat penalty
 - `seed` (number, optional): Random seed for text generation
 - `n_threads` (number, optional, default: 8): Number of threads to use for text generation
+
+
+### listMountedPersonalities
+
+This function retrieves a list of all the personalities currently mounted on the lollms server. It's particularly useful for users who wish to explore the different personas available for text generation. By using this function, you can select a specific personality index to generate text that aligns with a particular tone, style, or domain knowledge.
+
+#### Usage
+
+To use this function, simply call it from the `lollms_client_js` library. The function will return an array of personalities, each represented by an object containing at least an ID and a name. This allows you to easily identify and select the appropriate personality for your text generation needs.
+
+```javascript
+import { listMountedPersonalities } from 'lollms_client_js';
+
+async function showPersonalities() {
+  const personalities = await listMountedPersonalities();
+  console.log(personalities);
+}
+
+showPersonalities();
+```
+
+#### Output
+
+The function returns a promise that resolves to an array of objects. Each object represents a personality, containing the following properties:
+
+- `id` (number): The unique identifier of the personality.
+- `name` (string): The name of the personality.
+
+Example output:
+
+```json
+[
+  { "id": 0, "name": "Creative Writer" },
+  { "id": 1, "name": "Tech Enthusiast" },
+  { "id": 2, "name": "Science Fiction Guru" }
+]
+```
 
 ## 💻 Example
 

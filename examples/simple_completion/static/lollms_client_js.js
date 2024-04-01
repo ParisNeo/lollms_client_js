@@ -1,4 +1,4 @@
-async function generateText(prompt, host="http://localhost:9600", model_name=null, personality=-1, n_predict=1024, stream=false, temperature=1024,top_k= 50, top_p= 0.95, repeat_penalty= 0.8, repeat_last_n=40, seed=null, n_threads=8) {
+async function generateText(prompt, host="http://localhost:9600", model_name=null, personality=-1, n_predict=1024, stream=false, temperature=0.1,top_k= 50, top_p= 0.95, repeat_penalty= 0.8, repeat_last_n=40, seed=null, n_threads=8) {
   const defaultOptions = {
     prompt: prompt,
     model_name: model_name,
@@ -27,7 +27,15 @@ async function generateText(prompt, host="http://localhost:9600", model_name=nul
   
       if (response.ok) {
         const data = await response.text();
-        return data;
+        console.log(data)
+        let text = data.trim().replace(/\\"/g, '"');
+        if (text[0] === '"') {
+            text = text.substring(1);
+        }
+        if (text[text.length - 1] === '"') {
+            text = text.substring(0, text.length - 1);
+        }
+        return text;
       } else {
         throw new Error(`Request failed with status ${response.status}`);
       }
@@ -35,4 +43,17 @@ async function generateText(prompt, host="http://localhost:9600", model_name=nul
       console.error('Error:', error);
       return { status: false, error: error.message };
     }
+  }
+
+  function listMountedPersonalities(host="http://localhost:9600") {
+    fetch(`${host}/list_mounted_personalities`)
+      .then(response => response.json())
+      .then(data => {
+        // Handle the response data
+        console.log(data);
+      })
+      .catch(error => {
+        // Handle any errors that occur during the request
+        console.error('Error:', error);
+      });
   }

@@ -15,3 +15,5 @@ async def read_index(request: Request):
 
 # Mount the static directory
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# use: uvicorn main:app
