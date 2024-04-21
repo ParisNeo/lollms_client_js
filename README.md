@@ -109,6 +109,91 @@ Your contributions are welcome! Follow the steps below to contribute:
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
+
+# TasksLibrary Documentation
+
+The `TasksLibrary` is a JavaScript library designed to simplify and streamline the use of the LoLLMs (Lord Of Large Language Models) Client for common text processing tasks such as translation and summarization. This documentation provides an overview of the library's functionality and how to utilize it in your projects.
+
+## Getting Started
+
+To use the `TasksLibrary`, you first need an instance of the `LollmsClient`. This client is responsible for communicating with the LoLLMs service, sending prompts, and receiving generated text.
+
+### Installation
+
+Ensure you have the `LollmsClient` JavaScript class available in your project. The `TasksLibrary` class then needs to be included in your project:
+
+```javascript
+import { LollmsClient } from './path/to/lollms_client_js.js';
+import { TasksLibrary } from './path/to/lollms_client_js.js';
+```
+
+### Initialization
+
+Create an instance of the `LollmsClient` with your service configuration:
+
+```javascript
+const lollmsClient = new LollmsClient(
+  'your_host_address',
+  'your_model_name',
+  // Other parameters as needed
+);
+```
+
+Then, instantiate the `TasksLibrary` with the `LollmsClient` instance:
+
+```javascript
+const tasksLibrary = new TasksLibrary(lollmsClient);
+```
+
+## Features
+
+The `TasksLibrary` currently supports the following features:
+
+### Text Translation
+
+Translate a chunk of text to a specified language without altering the original meaning or adding extraneous information.
+
+#### Usage
+
+```javascript
+tasksLibrary.translateTextChunk(textChunk, outputLanguage)
+  .then(translatedText => {
+    console.log(translatedText);
+  })
+  .catch(error => {
+    console.error(error);
+  });
+```
+
+### Text Summarization
+
+Summarize a given text chunk in a concise manner, ensuring all key points are covered without introducing new information.
+
+#### Usage
+
+```javascript
+tasksLibrary.summarizeText(textChunk, summaryLength)
+  .then(summary => {
+    console.log(summary);
+  })
+  .catch(error => {
+    console.error(error);
+  });
+```
+
+## Parameters
+
+- `textChunk`: The text to be processed.
+- `outputLanguage`: (For translation) The target language for the translation.
+- `summaryLength`: (For summarization) The desired length of the summary. Can be "short", "medium", or "long".
+- `hostAddress`, `modelName`, `temperature`, `maxGenerationSize`: Additional parameters for customization and optimization of the task.
+
+## Conclusion
+
+The `TasksLibrary` is a powerful tool for developers working with text processing in the context of AI and robotics. By leveraging the capabilities of LoLLMs, it offers an easy and efficient way to perform complex tasks such as translation and summarization.
+
+For more information and updates, follow the project's [GitHub repository](https://github.com/your-repo) or join our community on [Discord](https://discord.gg/BDxacQmv).
+
 ## License
 
 This project is licensed under the Apache 2.0 License - see the `LICENSE` file for details.

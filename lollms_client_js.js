@@ -119,3 +119,72 @@ class LollmsClient {
       }
   }
 }
+
+class TasksLibrary {
+  constructor(lollms) {
+    this.lollms = lollms;
+  }
+
+  async translateTextChunk(textChunk, outputLanguage = "french", hostAddress = null, modelName = null, temperature = 0.1, maxGenerationSize = 3000) {
+    const translationPrompt = [
+      `!@>system:`,
+      `Translate the following text to ${outputLanguage}.`,
+      `Be faithful to the original text and do not add or remove any information.`,
+      `Respond only with the translated text.`,
+      `Do not add comments or explanations.`,
+      `!@>text to translate:`,
+      `${textChunk}`,
+      `!@>translation:`,
+    ].join("\n");
+
+    const translated = await this.lollms.generateText(
+      translationPrompt,
+      hostAddress,
+      modelName,
+      -1, // personality
+      maxGenerationSize, // nPredict
+      false, // stream
+      temperature, // temperature
+      undefined, // topK, using undefined to fallback on LollmsClient's default
+      undefined, // topP, using undefined to fallback on LollmsClient's default
+      undefined, // repeatPenalty, using undefined to fallback on LollmsClient's default
+      undefined, // repeatLastN, using undefined to fallback on LollmsClient's default
+      undefined, // seed, using undefined to fallback on LollmsClient's default
+      undefined, // nThreads, using undefined to fallback on LollmsClient's default
+      undefined // serviceKey, using undefined to fallback on LollmsClient's default
+    );
+
+    return translated;
+  }
+  async summarizeText(textChunk, summaryLength = "short", hostAddress = null, modelName = null, temperature = 0.1, maxGenerationSize = 1000) {
+    const summaryPrompt = [
+      `system:`,
+      `Summarize the following text in a ${summaryLength} manner.`,
+      `Keep the summary concise and to the point.`,
+      `Include all key points and do not add new information.`,
+      `Respond only with the summary.`,
+      `text to summarize:`,
+      `${textChunk}`,
+      `summary:`,
+    ].join("\n");
+
+    const summary = await this.lollms.generateText(
+      summaryPrompt,
+      hostAddress,
+      modelName,
+      -1, // personality
+      maxGenerationSize, // nPredict
+      false, // stream
+      temperature, // temperature
+      undefined, // topK, using undefined to fallback on LollmsClient's default
+      undefined, // topP, using undefined to fallback on LollmsClient's default
+      undefined, // repeatPenalty, using undefined to fallback on LollmsClient's default
+      undefined, // repeatLastN, using undefined to fallback on LollmsClient's default
+      undefined, // seed, using undefined to fallback on LollmsClient's default
+      undefined, // nThreads, using undefined to fallback on LollmsClient's default
+      undefined // serviceKey, using undefined to fallback on LollmsClient's default
+    );
+
+    return summary;
+  }  
+}
