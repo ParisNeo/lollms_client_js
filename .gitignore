@@ -85,3 +85,6 @@ lerna-debug.log*
 # temporary files
 *.tmp
 thumbs.db
+
+# poythopn
+__pycache__
