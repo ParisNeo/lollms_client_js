@@ -39,7 +39,7 @@ class TikToken {
       }
   
       async loadVocabulary() {
-        const modelVocabUrl = `https://openaipublic.blob.core.windows.net/encodings/main/${this.model_name}.tiktoken`;
+        const modelVocabUrl = `https://raw.githubusercontent.com/ParisNeo/lollms_client_js/main/tiktokens/${this.model_name}.tiktoken`;
 
         try {
             const response = await fetch(modelVocabUrl);
@@ -124,6 +124,9 @@ class LollmsClient {
       this.service_key = service_key;
       this.default_generation_mode = default_generation_mode;
     }
+    updateServerAddress(newAddress) {
+        this.serverAddress = newAddress;
+      }    
     tokenize(prompt) {
         /**
          * Tokenizes the given prompt using the model's tokenizer.
@@ -251,8 +254,6 @@ class LollmsClient {
           return null;
       }
   }
-
-
   
   async openai_generate(prompt, host_address = this.host_address, model_name = this.model_name, personality = this.personality, n_predict = this.n_predict, stream = false, temperature = this.temperature, top_k = this.top_k, top_p = this.top_p, repeat_penalty = this.repeat_penalty, repeat_last_n = this.repeat_last_n, seed = this.seed, n_threads = this.n_threads, ELF_COMPLETION_FORMAT = "vllm instruct", service_key = this.service_key, streamingCallback = null) {
       const url = `${host_address}/generate_completion`;

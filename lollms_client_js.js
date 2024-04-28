@@ -38,21 +38,29 @@ class TikToken {
         };
       }
   
-    async loadVocabulary() {
-      const modelVocabUrl = `https://openaipublic.blob.core.windows.net/${this.model_name}/encodings/main/encoder.json`;
-      
-      try {
-        const response = await fetch(modelVocabUrl);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+      async loadVocabulary() {
+        const modelVocabUrl = `https://raw.githubusercontent.com/ParisNeo/lollms_client_js/main/tiktokens/${this.model_name}.tiktoken`;
+
+        try {
+            const response = await fetch(modelVocabUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const vocabText = await response.text();
+            this.vocabulary.tokenToIndex = {};
+            this.vocabulary.indexToToken = {};
+
+            const lines = vocabText.trim().split('\n');
+            for (const line of lines) {
+                const [token, indexString] = line.split(' ');
+                const index = parseInt(indexString, 10);
+                const decodedToken = atob(token); // Decode Base64 token
+                this.vocabulary.tokenToIndex[decodedToken] = index;
+                this.vocabulary.indexToToken[index] = decodedToken;
+            }
+        } catch (error) {
+            console.error('Error loading vocabulary:', error);
         }
-        this.vocabulary.tokenToIndex = await response.json();
-        this.vocabulary.indexToToken = Object.fromEntries(
-          Object.entries(this.vocabulary.tokenToIndex).map(([token, index]) => [index, token])
-        );
-      } catch (error) {
-        console.error('Error loading vocabulary:', error);
-      }
     }
   
     encode(text) {
@@ -116,6 +124,9 @@ class LollmsClient {
       this.service_key = service_key;
       this.default_generation_mode = default_generation_mode;
     }
+    updateServerAddress(newAddress) {
+        this.serverAddress = newAddress;
+      }    
     tokenize(prompt) {
         /**
          * Tokenizes the given prompt using the model's tokenizer.

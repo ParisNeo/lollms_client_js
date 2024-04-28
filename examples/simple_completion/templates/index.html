@@ -122,12 +122,80 @@
     <button onclick="loadDiscussion()"><i class="fas fa-folder-open"></i> Load</button>
     <button onclick="listAvailablePersonas()"><i class="fas fa-folder-open"></i> List personalities</button>
   </div>
+  <button onclick="toggleSettings()"><i class="fas fa-cog"></i> Settings</button>
 
+  <div id="settings" style="display: none;">
+    <label for="serverAddress">Server Address: </label>
+    <input type="text" id="serverAddress" placeholder="Enter server address">
+    <br>
+    <label for="modelName">Model Name: </label>
+    <input type="text" id="modelName" placeholder="Enter model name">
+    <br>
+    <!-- Add other settings as needed -->
+    <button onclick="updateSettings()"><i class="fas fa-sync-alt"></i> Update</button>
+  </div>
   <script>
-    const lollmsClient = new LollmsClient("http://localhost:9600", );
+    const lollmsClient = new LollmsClient(getServerAddress());
     let full_prompt = "!@>system: This is a discussion between lollms the AI agent and a user.\nlollms is a very funny AI that makes everything turn to a joke.\nIt uses alot of emojies and have a great sense of humor.\n"
     const chatContainer = document.getElementById('chatContainer');
     const promptInput = document.getElementById('promptInput');
+    // Set the default value for the server address input field
+    document.getElementById('serverAddress').value = getServerAddress();
+    document.getElementById('modelName').value = getModelName();
+  
+    function toggleSettings() {
+      const settingsDiv = document.getElementById('settings');
+      settingsDiv.style.display = settingsDiv.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function getServerAddress() {
+      return localStorage.getItem('serverAddress') || 'http://localhost:9600';
+    }
+
+    function getModelName() {
+      return localStorage.getItem('modelName') || '';
+    }
+
+    // ... other getter functions for parameters ...
+
+    function setServerAddress(address) {
+      localStorage.setItem('serverAddress', address);
+    }
+
+    function setModelName(name) {
+      localStorage.setItem('modelName', name);
+    }
+
+    // ... other setter functions for parameters ...
+
+    function updateSettings() {
+      const newAddress = document.getElementById('serverAddress').value;
+      const newModelName = document.getElementById('modelName').value;
+      // ... get other updated parameter values
+
+      setServerAddress(newAddress);
+      setModelName(newModelName);
+      // ... set other updated parameters
+
+      lollmsClient.host_address = newAddress;
+      lollmsClient.model_name = newModelName;
+      // ... set other updated parameters using lollmsClient.setting = value
+    }
+
+    function getServerAddress() {
+      return localStorage.getItem('serverAddress') || 'http://localhost:9600';
+    }
+
+    function setServerAddress(address) {
+      localStorage.setItem('serverAddress', address);
+    }
+
+    function updateServerAddress() {
+      const newAddress = document.getElementById('serverAddress').value;
+      setServerAddress(newAddress);
+      lollmsClient.updateServerAddress(newAddress);
+    }
+
 
     promptInput.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
