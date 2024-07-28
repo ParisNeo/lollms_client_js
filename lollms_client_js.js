@@ -218,42 +218,42 @@ class LollmsClient {
             throw error; // Re-throw the error if you want to allow the caller to handle it as well
         }
     }
-    async lollms_generate(prompt, host_address = this.host_address, model_name = this.model_name, personality = this.personality, n_predict = this.n_predict, stream = false, temperature = this.temperature, top_k = this.top_k, top_p = this.top_p, repeat_penalty = this.repeat_penalty, repeat_last_n = this.repeat_last_n, seed = this.seed, n_threads = this.n_threads, service_key = this.service_key, streamingCallback = null) {
-      const url = `${host_address}/lollms_generate`;
-      const headers = service_key !== "" ? {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Authorization': `Bearer ${service_key}`,
-      } : {
-          'Content-Type': 'application/json',
-      };
+      async lollms_generate(prompt, host_address = this.host_address, model_name = this.model_name, personality = this.personality, n_predict = this.n_predict, stream = false, temperature = this.temperature, top_k = this.top_k, top_p = this.top_p, repeat_penalty = this.repeat_penalty, repeat_last_n = this.repeat_last_n, seed = this.seed, n_threads = this.n_threads, service_key = this.service_key, streamingCallback = null) {
+        const url = `${host_address}/lollms_generate`;
+        const headers = service_key !== "" ? {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Authorization': `Bearer ${service_key}`,
+        } : {
+            'Content-Type': 'application/json',
+        };
 
-      const data = JSON.stringify({
-          prompt: prompt,
-          model_name: model_name,
-          personality: personality,
-          n_predict: n_predict,
-          stream: stream,
-          temperature: temperature,
-          top_k: top_k,
-          top_p: top_p,
-          repeat_penalty: repeat_penalty,
-          repeat_last_n: repeat_last_n,
-          seed: seed,
-          n_threads: n_threads
-      });
+        const data = JSON.stringify({
+            prompt: prompt,
+            model_name: model_name,
+            personality: personality,
+            n_predict: n_predict,
+            stream: stream,
+            temperature: temperature,
+            top_k: top_k,
+            top_p: top_p,
+            repeat_penalty: repeat_penalty,
+            repeat_last_n: repeat_last_n,
+            seed: seed,
+            n_threads: n_threads
+        });
 
-      try {
-          const response = await fetch(url, {
-              method: 'POST',
-              headers: headers,
-              body: data
-          });
-          return await response.json();
-      } catch (error) {
-          console.error(error);
-          return null;
-      }
-  }
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: headers,
+                body: data
+            });
+            return await response;
+        } catch (error) {
+            console.error(error);
+            return null;
+        }
+    }
 
 
   
