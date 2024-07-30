@@ -1,6 +1,6 @@
 # JavaScript File Information
 
-## Classes
+# Classes
 
 ## LollmsClient
   constructor(
