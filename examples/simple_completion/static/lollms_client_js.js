@@ -46,7 +46,7 @@ class LollmsClient {
     this.host_address = host_address;
     this.model_name = model_name;
     this.ctx_size = ctx_size;
-    this.n_predict = n_predict;
+    this.n_predict = n_predict?n_predict:4096;
     this.personality = personality;
     this.temperature = temperature;
     this.top_k = top_k;
@@ -118,7 +118,7 @@ class LollmsClient {
       const output = await axios.post("/lollms_detokenize", {"tokens": tokensList});
       console.log(output.data.text)
       return output.data.text
-    }
+  }
   generate(prompt, {
       n_predict = null,
       stream = false,
@@ -203,12 +203,13 @@ class LollmsClient {
       } : {
           'Content-Type': 'application/json',
       };
-
+      console.log("n_predict:",n_predict)
+      console.log("self.n_predict:",this.n_predict)
       const data = JSON.stringify({
           prompt: prompt,
           model_name: model_name,
           personality: personality,
-          n_predict: n_predict?n_predict:self.n_predict,
+          n_predict: n_predict?n_predict:this.n_predict,
           stream: stream,
           temperature: temperature,
           top_k: top_k,
@@ -585,4 +586,59 @@ extractCodeBlocks(text) {
   return codeBlocks;
 }
 
+}
+
+
+class LOLLMSRAGClient {
+  constructor(baseURL, apiKey) {
+      this.baseURL = baseURL;
+      this.apiKey = apiKey;
+  }
+
+  async request(endpoint, method = 'GET', body = null) {
+      const headers = {
+          'Authorization': this.apiKey,
+          'Content-Type': 'application/json',
+      };
+
+      const options = {
+          method,
+          headers,
+      };
+
+      if (body) {
+          options.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(`${this.baseURL}${endpoint}`, options);
+
+      if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Error: ${errorData.detail || response.statusText}`);
+      }
+
+      return response.json();
+  }
+
+  async addDocument(title, content, path = "unknown") {
+      const document = { title, content, path };
+      return this.request('/add_document', 'POST', document);
+  }
+
+  async removeDocument(documentId) {
+      return this.request(`/remove_document/${documentId}`, 'POST');
+  }
+
+  async indexDatabase() {
+      return this.request('/index_database', 'POST');
+  }
+
+  async search(query) {
+      const searchQuery = { query };
+      return this.request('/search', 'POST', searchQuery);
+  }
+
+  async wipeDatabase() {
+      return this.request('/wipe_database', 'DELETE');
+  }
 }
