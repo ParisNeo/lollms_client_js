@@ -9,7 +9,8 @@ const ELF_GENERATION_FORMAT = {
   LOLLMS: 0,
   OPENAI: 1,
   OLLAMA: 2,
-  LITELLM: 2
+  LITELLM: 3,
+  VLLM: 4
 };
 
 // JavaScript equivalent of the ELF_COMPLETION_FORMAT enum
@@ -22,14 +23,31 @@ const ELF_COMPLETION_FORMAT = {
 Object.freeze(ELF_GENERATION_FORMAT);
 Object.freeze(ELF_COMPLETION_FORMAT);
 
-
+// Helper function to convert string to ELF_GENERATION_FORMAT
+function convertToGenerationFormat(mode) {
+  if (typeof mode === 'string') {
+      // Convert string to uppercase for case-insensitive comparison
+      const upperMode = mode.toUpperCase();
+      
+      // Find matching key in ELF_GENERATION_FORMAT
+      for (const [key, value] of Object.entries(ELF_GENERATION_FORMAT)) {
+          if (key === upperMode) {
+              return value;
+          }
+      }
+      // If no match found, return default LOLLMS (0)
+      return ELF_GENERATION_FORMAT.LOLLMS;
+  }
+  // If not a string, return the value as is
+  return mode;
+}
 class LollmsClient {
   constructor(
     host_address = null,
     model_name = null,
-    ctx_size = 4096,
+    ctx_size = null,
     personality = -1,
-    n_predict = 4096,
+    n_predict = null,
     temperature = 0.1,
     top_k = 50,
     top_p = 0.95,
@@ -46,7 +64,7 @@ class LollmsClient {
     this.host_address = host_address;
     this.model_name = model_name;
     this.ctx_size = ctx_size;
-    this.n_predict = n_predict?n_predict:4096;
+    this.n_predict = n_predict?n_predict:null;
     this.personality = personality;
     this.temperature = temperature;
     this.top_k = top_k;
@@ -56,7 +74,7 @@ class LollmsClient {
     this.seed = seed;
     this.n_threads = n_threads;
     this.service_key = service_key;
-    this.default_generation_mode = default_generation_mode;
+    this.default_generation_mode = convertToGenerationFormat(default_generation_mode);
     this.minNPredict = 10
     this.template = {
       start_header_id_template: "!@>",
@@ -101,7 +119,7 @@ class LollmsClient {
     if ('seed' in settings) this.seed = settings.seed;
     if ('n_threads' in settings) this.n_threads = settings.n_threads;
     if ('service_key' in settings) this.service_key = settings.service_key;
-    if ('default_generation_mode' in settings) this.default_generation_mode = settings.default_generation_mode;
+    if ('default_generation_mode' in settings) this.default_generation_mode = convertToGenerationFormat(settings.default_generation_mode);
 
     // You might want to add some validation or type checking here
 
@@ -113,6 +131,9 @@ class LollmsClient {
   }
   system_message(){
     return this.template.start_header_id_template+this.template.system_message_template+this.template.end_header_id_template
+  }
+  custom_system_message(msg){
+    return this.template.start_header_id_template+msg+this.template.end_header_id_template
   }
   ai_message(ai_name="assistant"){
     return this.template.start_ai_header_id_template+ai_name+this.template.end_ai_header_id_template
@@ -126,27 +147,44 @@ class LollmsClient {
   updateServerAddress(newAddress) {
       this.serverAddress = newAddress;
     }    
-  async tokenize(prompt) {
+  async tokenize(prompt, return_named=false) {
       /**
        * Tokenizes the given prompt using the model's tokenizer.
        *
        * @param {string} prompt - The input prompt to be tokenized.
        * @returns {Array} A list of tokens representing the tokenized prompt.
        */
-      const output = await axios.post("/lollms_tokenize", {"prompt": prompt});
-      return output.data.named_tokens
+      const output = await axios.post("/lollms_tokenize", {"prompt": prompt, "return_named": return_named});
+      if(return_named)
+      {
+        return output.data  
+      }
+      else{
+        return output.data
+      }
     }
-  async detokenize(tokensList) {
+  async detokenize(tokensList, return_named=false) {
       /**
        * Detokenizes the given list of tokens using the model's tokenizer.
        *
        * @param {Array} tokensList - A list of tokens to be detokenized.
        * @returns {string} The detokenized text as a string.
        */
-      const output = await axios.post("/lollms_detokenize", {"tokens": tokensList});
-      console.log(output.data.text)
-      return output.data.text
+      const output = await axios.post("/lollms_detokenize", {"tokens": tokensList, "return_named": return_named});
+      if(return_named)
+        {
+         console.log(output.data.text)
+         return output.data.text
+        }
+        else{
+          console.log(output.data)
+          return output.data
+        }
   }
+cancel_generation() {
+  // TODO: implement
+}
+
   generate(prompt, {
       n_predict = null,
       stream = false,
@@ -169,11 +207,13 @@ class LollmsClient {
           return this.ollama_generate(prompt, this.host_address, this.model_name, -1, n_predict, stream, temperature, top_k, top_p, repeat_penalty, repeat_last_n, seed, n_threads, ELF_COMPLETION_FORMAT.INSTRUCT, service_key, streamingCallback);
         case ELF_GENERATION_FORMAT.LITELLM:
           return this.litellm_generate(prompt, this.host_address, this.model_name, -1, n_predict, stream, temperature, top_k, top_p, repeat_penalty, repeat_last_n, seed, n_threads, ELF_COMPLETION_FORMAT.INSTRUCT, service_key, streamingCallback);
+        case ELF_GENERATION_FORMAT.VLLM:
+          return this.vllm_generate(prompt, this.host_address, this.model_name, -1, n_predict, stream, temperature, top_k, top_p, repeat_penalty, repeat_last_n, seed, n_threads, ELF_COMPLETION_FORMAT.INSTRUCT, service_key, streamingCallback);
         default:
           throw new Error('Invalid generation mode');
       }
     }
-    generate_with_images(prompt, images, {
+    generate_with_images(prompt, images,
       n_predict = null,
       stream = false,
       temperature = 0.1,
@@ -185,7 +225,7 @@ class LollmsClient {
       n_threads = 8,
       service_key = "",
       streamingCallback = null
-    } = {}) {
+    ) {
       switch (this.default_generation_mode) {
         case ELF_GENERATION_FORMAT.LOLLMS:
           return this.lollms_generate_with_images(prompt, images, this.host_address, this.model_name, -1, n_predict, stream, temperature, top_k, top_p, repeat_penalty, repeat_last_n, seed, n_threads, service_key, streamingCallback);
@@ -390,6 +430,7 @@ async openai_generate(prompt, host_address = this.host_address, model_name = thi
     }
 }
 
+
 async openai_generate_with_images(prompt, images, options = {}) {
   const {
     host_address = this.host_address,
@@ -511,6 +552,133 @@ async openai_generate_with_images(prompt, images, options = {}) {
   }
 }
 
+
+async vllm_generate({
+  prompt,
+  host_address = null,
+  model_name = null,
+  personality = null,
+  n_predict = null,
+  stream = false,
+  temperature = null,
+  top_k = null,
+  top_p = null,
+  repeat_penalty = null,
+  repeat_last_n = null,
+  seed = null,
+  n_threads = null,
+  completion_format = ELF_COMPLETION_FORMAT.Instruct, // Instruct or Chat
+  service_key = "",
+  streaming_callback = null
+}) {
+  // Set default values to instance variables if optional arguments are null
+  host_address = host_address || this.host_address;
+  model_name = model_name || this.model_name;
+  n_predict = n_predict || this.n_predict || this.minNPredict;
+  personality = personality !== null ? personality : this.personality;
+  temperature = temperature !== null ? temperature : this.temperature;
+  top_k = top_k !== null ? top_k : this.top_k;
+  top_p = top_p !== null ? top_p : this.top_p;
+  repeat_penalty = repeat_penalty !== null ? repeat_penalty : this.repeat_penalty;
+  repeat_last_n = repeat_last_n !== null ? repeat_last_n : this.repeat_last_n;
+  seed = seed || this.seed;
+  n_threads = n_threads || this.n_threads;
+
+  const headers = {
+    "Content-Type": "application/json",
+    ...(service_key && { Authorization: `Bearer ${service_key}` })
+  };
+
+  let data;
+  let completionFormatPath;
+
+  if (completion_format === ELF_COMPLETION_FORMAT.Instruct) {
+    data = {
+      model: model_name,
+      prompt: prompt,
+      stream: stream,
+      temperature: parseFloat(temperature),
+      max_tokens: n_predict
+    };
+    completionFormatPath = "/v1/completions";
+  } else if (completion_format === ELF_COMPLETION_FORMAT.Chat) {
+    data = {
+      model: model_name,
+      messages: [
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      stream: stream,
+      temperature: parseFloat(temperature),
+      max_tokens: n_predict
+    };
+    completionFormatPath = "/v1/chat/completions";
+  }
+
+  if (host_address.endsWith("/")) {
+    host_address = host_address.slice(0, -1);
+  }
+
+  const url = `${host_address}${completionFormatPath}`;
+
+  try {
+    const response = await axios.post(url, data, {
+      headers: headers,
+      responseType: stream ? "stream" : "json",
+      httpsAgent: this.verifySslCertificate
+        ? undefined
+        : new (require("https").Agent)({ rejectUnauthorized: false })
+    });
+
+    if (stream) {
+      let text = "";
+      response.data.on("data", (chunk) => {
+        const decoded = chunk.toString("utf-8");
+        if (decoded.startsWith("data: ")) {
+          try {
+            const jsonData = JSON.parse(decoded.slice(5).trim());
+            let chunkContent = "";
+            if (completion_format === ELF_COMPLETION_FORMAT.Chat) {
+              chunkContent = jsonData.choices[0]?.delta?.content || "";
+            } else {
+              chunkContent = jsonData.choices[0]?.text || "";
+            }
+            text += chunkContent;
+            if (streaming_callback) {
+              if (!streaming_callback(chunkContent, "MSG_TYPE_CHUNK")) {
+                response.data.destroy();
+              }
+            }
+          } catch (error) {
+            response.data.destroy();
+          }
+        }
+      });
+
+      return new Promise((resolve, reject) => {
+        response.data.on("end", () => resolve(text));
+        response.data.on("error", (err) => reject(err));
+      });
+    } else {
+      return response.data;
+    }
+  } catch (error) {
+    if (error.response) {
+      const errorMessage =
+        error.response.data?.error?.message ||
+        error.response.data?.message ||
+        "Unknown error occurred";
+      console.error(errorMessage);
+      throw new Error(errorMessage);
+    } else {
+      console.error(error.message);
+      throw error;
+    }
+  }
+}
+
 async encode_image(image_path, max_image_width = -1) {
   // In a browser environment, we'll use the File API and canvas
   // For Node.js, you'd need to use libraries like 'sharp' or 'jimp'
@@ -548,23 +716,31 @@ async encode_image(image_path, max_image_width = -1) {
     img.src = image_path;
   });
 }
-async generateCode(prompt, images = [], {
-  n_predict = null,
-  stream = false,
-  temperature = 0.1,
-  top_k = 50,
-  top_p = 0.95,
-  repeat_penalty = 0.8,
-  repeat_last_n = 40,
-  seed = null,
-  n_threads = 8,
-  service_key = "",
-  streamingCallback = null
-} = {}){
+async generateCode(
+  prompt, 
+  template=null,
+  language="json",
+  images = [],  
+  {
+    n_predict = null,
+    temperature = 0.1,
+    top_k = 50,
+    top_p = 0.95,
+    repeat_penalty = 0.8,
+    repeat_last_n = 40,
+    streamingCallback = null
+  } = {}
+){
   let response;
   const systemHeader = this.custom_message("Generation infos");
-  const codeInstructions = "Generated code must be put inside the adequate markdown code tag. Use this template:\n```language name\nCode\n```\nMake sure only a single code tag is generated at each dialogue turn.\n";
-  const fullPrompt = systemHeader + codeInstructions + this.separatorTemplate() + prompt;
+  let codeInstructions = "";
+  if(template){
+      codeInstructions =   "Generated code must be put inside the adequate markdown code tag. Use this template:\n```"+language+"\n"+template+"\n```\nMake sure only a single code tag is generated at each dialogue turn.\n";
+  }
+  else{
+      codeInstructions =   "Generated code must be put inside the adequate markdown code tag. Use this template:\n```language name\nCode\n```\nMake sure only a single code tag is generated at each dialogue turn.\n";
+  }
+  const fullPrompt = systemHeader + codeInstructions + this.separatorTemplate() + prompt + this.ai_message();
 
   if (images.length > 0) {
       response = await this.generate_with_images(fullPrompt, images, {
@@ -589,14 +765,15 @@ async generateCode(prompt, images = [], {
   }
 
   const codes = this.extractCodeBlocks(response);
+  console.log(codes)
   if (codes.length > 0) {
       let code = '';
       if (!codes[0].is_complete) {
           code = codes[0].content.split('\n').slice(0, -1).join('\n');
           while (!codes[0].is_complete) {
               console.warn("The AI did not finish the code, let's ask it to continue")
-              const continuePrompt = prompt + code + this.userFullHeader + "continue the code. Rewrite last line and continue the code." + this.separatorTemplate() + this.aiFullHeader;
-              response = await this.generate(fullPrompt, {
+              const continuePrompt = prompt + self.separator_template + code + self.separator_template + this.user_message() + "continue the code. Rewrite last line and continue the code. Don't forget to put the code inside a markdown code tag." + this.separatorTemplate() + this.aiFullHeader;
+              response = await this.generate(continuePrompt, {
                   n_predict: n_predict,
                   temperature: temperature,
                   top_k: top_k,
@@ -605,13 +782,13 @@ async generateCode(prompt, images = [], {
                   repeat_last_n: repeat_last_n,
                   callback: streamingCallback
               });
-              const newCodes = this.extractCodeBlocks(response);
-              if (newCodes.length === 0) break;
+              const codes = this.extractCodeBlocks(response);
+              if (codes.length === 0) break;
               
-              if (!newCodes[0].is_complete) {
-                  code += '\n' + newCodes[0].content.split('\n').slice(0, -1).join('\n');
+              if (!codes[0].is_complete) {
+                  code += '\n' + codes[0].content.split('\n').slice(0, -1).join('\n');
               } else {
-                  code += '\n' + newCodes[0].content;
+                  code += '\n' + codes[0].content;
               }
           }
       } else {
@@ -624,15 +801,11 @@ async generateCode(prompt, images = [], {
 }
 async generateCodes(prompt, images = [], {
   n_predict = null,
-  stream = false,
   temperature = 0.1,
   top_k = 50,
   top_p = 0.95,
   repeat_penalty = 0.8,
   repeat_last_n = 40,
-  seed = null,
-  n_threads = 8,
-  service_key = "",
   streamingCallback = null
 } = {}) {
   let response;
@@ -671,7 +844,7 @@ async generateCodes(prompt, images = [], {
 
     while (!currentCode.is_complete) {
       console.warn("The AI did not finish the code, let's ask it to continue");
-      const continuePrompt = prompt + codeContent + this.userFullHeader + "continue the code. Rewrite last line and continue the code." + this.separatorTemplate() + this.aiFullHeader;
+      const continuePrompt = prompt + self.separator_template + codeContent + self.separator_template + this.user_message() + "continue the code. Rewrite last line and continue the code." + this.separatorTemplate() + this.aiFullHeader;
       
       response = await this.generate(continuePrompt, {
         n_predict,
@@ -704,94 +877,84 @@ async generateCodes(prompt, images = [], {
 
   return completeCodes;
 }
-
-extractCodeBlocks(text) {
-  const codeBlocks = [];
-  let remaining = text;
-  let blocIndex = 0;
-  let firstIndex = 0;
-  const indices = [];
-
-  // Find all code block delimiters
-  while (remaining.length > 0) {
-    const index = remaining.indexOf("```");
-    if (index === -1) {
-      if (blocIndex % 2 === 1) {
-        indices.push(remaining.length + firstIndex);
+extractCodeBlocks(text, return_remaining_text = false) {
+  const codes = [];
+  let remainingText = text;
+  let currentIndex = 0;
+  
+  while (true) {
+      // Find next code block start
+      const startPos = remainingText.indexOf('```');
+      if (startPos === -1) {
+          break;
       }
-      break;
-    }
-    indices.push(index + firstIndex);
-    remaining = remaining.slice(index + 3);
-    firstIndex += index + 3;
-    blocIndex++;
-  }
-
-  let isStart = true;
-  for (let i = 0; i < indices.length; i++) {
-    if (isStart) {
-      const blockInfo = {
-        index: i,
-        file_name: "",
-        section: "",
-        content: "",
-        type: "",
-        is_complete: false
-      };
-
-      // Check for file name in preceding line
-      const precedingText = text.slice(0, indices[i]).trim().split('\n');
-      if (precedingText.length > 0) {
-        const lastLine = precedingText[precedingText.length - 1].trim();
-        if (lastLine.startsWith("<file_name>") && lastLine.endsWith("</file_name>")) {
-          blockInfo.file_name = lastLine.slice("<file_name>".length, -"</file_name>".length).trim();
-        } else if (lastLine.startsWith("## filename:")) {
-          blockInfo.file_name = lastLine.slice("## filename:".length).trim();
-        }
-        if (lastLine.startsWith("<section>") && lastLine.endsWith("</section>")) {
-          blockInfo.section = lastLine.slice("<section>".length, -"</section>".length).trim();
-        }
-      }
-
-      const subText = text.slice(indices[i] + 3);
-      if (subText.length > 0) {
-        const findSpace = subText.indexOf(" ");
-        const findReturn = subText.indexOf("\n");
-        let nextIndex = Math.min(findSpace === -1 ? Infinity : findSpace, findReturn === -1 ? Infinity : findReturn);
-        if (subText.slice(0, nextIndex).includes('{')) {
-          nextIndex = 0;
-        }
-        const startPos = nextIndex;
-
-        if (text[indices[i] + 3] === "\n" || text[indices[i] + 3] === " " || text[indices[i] + 3] === "\t") {
-          blockInfo.type = 'language-specific';
-        } else {
-          blockInfo.type = subText.slice(0, nextIndex);
-        }
-
-        if (i + 1 < indices.length) {
-          const nextPos = indices[i + 1] - indices[i];
-          if (nextPos - 3 < subText.length && subText[nextPos - 3] === "`") {
-            blockInfo.content = subText.slice(startPos, nextPos - 3).trim();
-            blockInfo.is_complete = true;
-          } else {
-            blockInfo.content = subText.slice(startPos, nextPos).trim();
-            blockInfo.is_complete = false;
+          
+      // Check for file name before code block
+      let fileName = '';
+      const fileNameMatch = remainingText.slice(0, startPos).lastIndexOf('<file_name>');
+      if (fileNameMatch !== -1) {
+          const fileNameEnd = remainingText.slice(0, startPos).lastIndexOf('</file_name>');
+          if (fileNameEnd !== -1 && fileNameMatch < fileNameEnd) {
+              fileName = remainingText.slice(fileNameMatch + 11, fileNameEnd).trim();
           }
-        } else {
-          blockInfo.content = subText.slice(startPos).trim();
-          blockInfo.is_complete = false;
-        }
-
-        codeBlocks.push(blockInfo);
       }
-      isStart = false;
-    } else {
-      isStart = true;
-    }
+      
+      // Get code type if specified
+      let codeType = '';
+      const nextNewline = remainingText.indexOf('\n', startPos + 3);
+      let contentStart;
+      
+      if (nextNewline !== -1) {
+          const potentialType = remainingText.slice(startPos + 3, nextNewline).trim();
+          if (potentialType) {
+              codeType = potentialType;
+              contentStart = nextNewline + 1;
+          } else {
+              contentStart = startPos + 3;
+          }
+      } else {
+          contentStart = startPos + 3;
+      }
+          
+      // Find matching end tag
+      let pos = contentStart;
+      let is_complete = false;
+      
+      // Find the closing backticks
+      const endPos = remainingText.indexOf('```', contentStart);
+      
+      if (endPos !== -1) {
+          // Found matching end tag
+          const content = remainingText.slice(contentStart, endPos).trim();
+          is_complete = true;
+          codes.push({
+              index: currentIndex,
+              fileName: fileName,
+              content: content,
+              type: codeType,
+              is_complete: true
+          });
+          remainingText = remainingText.slice(endPos + 3);
+      } else {
+          // Handle incomplete code block
+          const content = remainingText.slice(contentStart).trim();
+          codes.push({
+              index: currentIndex,
+              fileName: fileName,
+              content: content,
+              type: codeType,
+              is_complete: false
+          });
+          remainingText = '';
+      }
+          
+      currentIndex++;
   }
-
-  return codeBlocks;
+  
+  if (return_remaining_text) {
+      return { codes, remainingText };
+  }
+  return codes;
 }
 
 
@@ -822,7 +985,7 @@ async listModels(host_address = this.host_address) {
 }
 
 class TextChunker {
-  constructor(chunkSize = 512, overlap = 0, tokenizer = null, model = null) {
+  constructor(chunkSize = 1024, overlap = 0, tokenizer = null, model = null) {
     this.chunkSize = chunkSize;
     this.overlap = overlap;
     this.tokenizer = tokenizer || new TikTokenTokenizer();
@@ -880,45 +1043,108 @@ class TextChunker {
     return lines.filter(line => line.trim()).join('\n');
   }
 
-  static async chunkText(text, tokenizer, chunkSize = 512, overlap = 0, cleanChunk = true, minNbTokensInChunk = 10) {
+  static async chunkText(text, tokenizer, chunkSize = 1024, overlap = 0, cleanChunk = true, minNbTokensInChunk = 10) {
+    // Validate chunkSize
+    if (isNaN(chunkSize) || chunkSize <= 0) {
+        console.warn(`Invalid chunkSize: ${chunkSize}. Resetting to default value of 1024.`);
+        chunkSize = 1024;
+    }
+
     const paragraphs = text.split('\n\n');
     const chunks = [];
     let currentChunk = [];
     let currentTokens = 0;
+
+    console.log("Starting text chunking...");
+    console.log(`Using chunkSize: ${chunkSize}, overlap: ${overlap}, minNbTokensInChunk: ${minNbTokensInChunk}`);
+
     for (const paragraph of paragraphs) {
-      const cleanedParagraph = cleanChunk ? paragraph.trim() : paragraph;
-      const paragraphTokens = (await tokenizer.tokenize(cleanedParagraph)).length;
+        const cleanedParagraph = cleanChunk ? paragraph.trim() : paragraph;
+        const paragraphTokens = (await tokenizer.tokenize(cleanedParagraph)).length;
 
-      if (currentTokens + paragraphTokens > chunkSize) {
-        if (currentTokens > minNbTokensInChunk) {
-          let chunkText = currentChunk.join('\n\n');
-          if (cleanChunk) {
-            chunkText = TextChunker.removeUnnecessaryReturns(chunkText);
-          }
-          chunks.push(chunkText);
+        console.log(`Processing paragraph: "${cleanedParagraph}"`);
+        console.log(`Paragraph tokens: ${paragraphTokens}`);
+        console.log(`Current tokens before adding: ${currentTokens}`);
+
+        // Handle case where a single paragraph exceeds chunkSize
+        if (paragraphTokens > chunkSize) {
+            console.log(`Paragraph exceeds chunk size. Splitting...`);
+            const splitParagraphs = await this.splitLargeParagraph(cleanedParagraph, tokenizer, chunkSize, overlap);
+            for (const subChunk of splitParagraphs) {
+                chunks.push(subChunk);
+                console.log(`Chunk created from large paragraph: "${subChunk}"`);
+            }
+            continue;
         }
 
-        if (overlap > 0) {
-          currentChunk = [...currentChunk.slice(-overlap), cleanedParagraph];
+        // If adding this paragraph exceeds the chunk size
+        if (currentTokens + paragraphTokens > chunkSize) {
+            if (currentTokens >= minNbTokensInChunk) {
+                let chunkText = currentChunk.join('\n\n');
+                if (cleanChunk) {
+                    chunkText = TextChunker.removeUnnecessaryReturns(chunkText);
+                }
+                chunks.push(chunkText);
+                console.log(`Intermediate chunk created and added: "${chunkText}"`);
+            } else {
+                console.log("Skipping chunk creation due to insufficient tokens.");
+            }
+
+            // Handle overlap
+            if (overlap > 0) {
+                currentChunk = currentChunk.slice(-overlap); // Keep only the overlapping part
+            } else {
+                currentChunk = [];
+            }
+
+            currentChunk.push(cleanedParagraph);
+            currentTokens = paragraphTokens; // Reset token count to the new paragraph's tokens
         } else {
-          currentChunk = [cleanedParagraph];
+            // Add paragraph to the current chunk
+            currentChunk.push(cleanedParagraph);
+            currentTokens += paragraphTokens;
         }
-        currentTokens = currentChunk.reduce(async (sum, p) => sum + await tokenizer.tokenize(p).length, 0);
-      } else {
-        currentChunk.push(cleanedParagraph);
-        currentTokens += paragraphTokens;
-      }
-    }    
-    if (currentChunk.length > 0 && currentTokens > minNbTokensInChunk) {
-      let chunkText = currentChunk.join('\n\n');
-      if (cleanChunk) {
-        chunkText = TextChunker.removeUnnecessaryReturns(chunkText);
-      }
-      chunks.push(chunkText);
+
+        console.log(`Current chunk after processing: ${currentChunk.join(' | ')}`);
+        console.log(`Current tokens after processing: ${currentTokens}`);
+    }
+
+    // Add the last chunk if it meets the minimum token requirement
+    if (currentChunk.length > 0 && currentTokens >= minNbTokensInChunk) {
+        let chunkText = currentChunk.join('\n\n');
+        if (cleanChunk) {
+            chunkText = TextChunker.removeUnnecessaryReturns(chunkText);
+        }
+        chunks.push(chunkText);
+        console.log(`Final chunk created and added: "${chunkText}"`);
+    } else {
+        console.log("No final chunk created due to insufficient tokens.");
+    }
+
+    console.log("Final Chunks:");
+    console.log(chunks);
+    return chunks;
+  }
+
+  // Helper function to split a large paragraph into smaller chunks
+  static async splitLargeParagraph(paragraph, tokenizer, chunkSize, overlap) {
+    const tokens = await tokenizer.tokenize(paragraph);
+    const chunks = [];
+    let start = 0;
+
+    while (start < tokens.length) {
+        const end = Math.min(start + chunkSize, tokens.length);
+        const chunkTokens = tokens.slice(start, end);
+        const chunkText = await tokenizer.detokenize(chunkTokens);
+        chunks.push(chunkText);
+
+        start += chunkSize - overlap; // Move start forward with overlap
     }
 
     return chunks;
   }
+
+
 }
 
 class TasksLibrary {
@@ -928,14 +1154,14 @@ constructor(lollms) {
 
 async translateTextChunk(textChunk, outputLanguage = "french", host_address = null, model_name = null, temperature = 0.1, maxGenerationSize = 3000) {
   const translationPrompt = [
-    `!@>system:`,
+    `${this.lollms.system_message()}`,
     `Translate the following text to ${outputLanguage}.`,
     `Be faithful to the original text and do not add or remove any information.`,
     `Respond only with the translated text.`,
     `Do not add comments or explanations.`,
-    `!@>text to translate:`,
+    `${this.lollms.user_message("text to translate")}`,
     `${textChunk}`,
-    `!@>translation:`,
+    `${this.lollms.ai_message("translation")}`,
   ].join("\n");
 
   const translated = await this.lollms.generateText(
@@ -969,27 +1195,28 @@ async summarizeText(
   docName = "chunk",
   answerStart = "",
   maxGenerationSize = 3000,
-  maxSummarySize = 512,
+  maxSummarySize = 1024,
   callback = null,
   chunkSummaryPostProcessing = null,
   summaryMode = "SEQUENTIAL",
   reformat=false
 ) {
-  console.log("Tokenizing:")
-  console.log(text)
-
+  console.log("Tokenizing incoming text:")
   let tk = await this.tokenize(text);
   let prevLen = tk.length;
   let documentChunks = null;
-  console.log(`Text size: ${prevLen}`)
+  console.log(`Text size: ${prevLen}/${maxSummarySize}`)
 
   while (tk.length > maxSummarySize && (documentChunks === null || documentChunks.length > 1)) {
       this.stepStart(`Compressing ${docName}...`);
-      let chunkSize = Math.floor(this.lollms.ctxSize * 0.6);
+      let chunkSize=1024;
+      if(this.lollms.ctxSize){
+        chunkSize = Math.floor(this.lollms.ctxSize * 0.6);
+      }
+      console.log("Chunk size:",chunkSize)
       documentChunks = await TextChunker.chunkText(text, this.lollms, chunkSize, 0, true);
-      console.log(`documentChunks: ${documentChunks}`)
-      text = await this.summarizeChunks({
-          chunks: documentChunks,
+      text = await this.summarizeChunks(
+          documentChunks,
           summaryInstruction,
           docName,
           answerStart,
@@ -997,7 +1224,7 @@ async summarizeText(
           callback,
           chunkSummaryPostProcessing,
           summaryMode
-      });
+      );
       tk = await this.tokenize(text);
       let dtkLn = prevLen - tk.length;
       prevLen = tk.length;
@@ -1020,34 +1247,37 @@ async summarizeText(
   return text;
 }
 
-async smartDataExtraction({
+async smartDataExtraction(
   text,
   dataExtractionInstruction = "summarize the current chunk.",
   finalTaskInstruction = "reformulate with better wording",
   docName = "chunk",
   answerStart = "",
   maxGenerationSize = 3000,
-  maxSummarySize = 512,
+  maxSummarySize = 1024,
   callback = null,
   chunkSummaryPostProcessing = null,
   summaryMode = "SEQUENTIAL"
-}) {
+) {
   let tk = await this.tokenize(text);
   let prevLen = tk.length;
 
   while (tk.length > maxSummarySize) {
-      let chunkSize = Math.floor(this.lollms.ctxSize * 0.6);
-      let documentChunks = await TextChunker.chunkText(text, this.lollms, chunkSize, 0, true);
-      text = await this.summarizeChunks({
-          chunks: documentChunks,
-          summaryInstruction: dataExtractionInstruction,
+    let chunkSize=1024;
+    if(this.lollms.ctxSize){
+      chunkSize = Math.floor(this.lollms.ctxSize * 0.6);
+    }
+    let documentChunks = await TextChunker.chunkText(text, this.lollms, chunkSize, 0, true);
+      text = await this.summarizeChunks(          
+          documentChunks,
+          dataExtractionInstruction,
           docName,
           answerStart,
           maxGenerationSize,
           callback,
           chunkSummaryPostProcessing,
           summaryMode
-      });
+      );
       tk = await this.tokenize(text);
       let dtkLn = prevLen - tk.length;
       prevLen = tk.length;
@@ -1056,21 +1286,22 @@ async smartDataExtraction({
   }
 
   this.stepStart("Rewriting ...");
-  text = await this.summarizeChunks({
-      chunks: [text],
-      summaryInstruction: finalTaskInstruction,
+  text = await this.summarizeChunks(
+      [text],
+      finalTaskInstruction,
       docName,
       answerStart,
       maxGenerationSize,
       callback,
-      chunkSummaryPostProcessing
-  });
+      chunkSummaryPostProcessing,
+      summaryMode
+  );
   this.stepEnd("Rewriting ...");
 
   return text;
 }
 
-async summarizeChunks({
+async summarizeChunks(
   chunks,
   summaryInstruction = "summarize the current chunk.",
   docName = "chunk",
@@ -1079,24 +1310,27 @@ async summarizeChunks({
   callback = null,
   chunkSummaryPostProcessing = null,
   summaryMode = "SEQUENTIAL"
-}) {
+) {
   if (summaryMode === "SEQUENTIAL") {
       let summary = "";
       for (let i = 0; i < chunks.length; i++) {
           this.stepStart(`Summary of ${docName} - Processing chunk: ${i + 1}/${chunks.length}`);
+          console.log(`chunk:${i}`);
+          console.log(chunks[i]);
           summary = `${answerStart}` + await this.fastGen(
               [
-                  this.lollms.system_message(),
+                  this.lollms.custom_system_message("Previous chunks summary"),
                   `${summary}`,
-                  this.lollms.system_message(),
+                  this.lollms.custom_system_message("Current text chunk"),
                   `${chunks[i]}`,
-                  this.lollms.system_message(),
+                  this.lollms.user_message(),
                   summaryInstruction,
-                  "Keep only information relevant to the context",
-                  "The output must keep information from the previous chunk analysis and add the current chunk extracted information.",
-                  "Be precise and do not invent information that does not exist in the previous chunks analysis or the current chunk.",
-                  "Do not add any extra comments.",
-                  this.lollms.system_message() + answerStart
+                  this.lollms.custom_system_message("important"),
+                  "Keep only information relevant to the context provided by the user",
+                  "The output must keep information from the previous chunks summary and add the current chunk extracted information.",
+                  "Be precise and do not invent information that does not exist in the previous chunks summary or the current chunk.",
+                  "Do not add any extra comments and start your message directly by the summary.",
+                  this.lollms.ai_message() + answerStart
               ].join("\n"),
               maxGenerationSize,
               callback
@@ -1314,96 +1548,6 @@ buildPrompt(promptParts, sacrificeId = -1, contextSize = null, minimumSpareConte
   }
 }
 
-extractCodeBlocks(text) {
-  const codeBlocks = [];
-  let remaining = text;
-  let blocIndex = 0;
-  let firstIndex = 0;
-  const indices = [];
-
-  // Find all code block delimiters
-  while (remaining.length > 0) {
-    const index = remaining.indexOf("```");
-    if (index === -1) {
-      if (blocIndex % 2 === 1) {
-        indices.push(remaining.length + firstIndex);
-      }
-      break;
-    }
-    indices.push(index + firstIndex);
-    remaining = remaining.slice(index + 3);
-    firstIndex += index + 3;
-    blocIndex++;
-  }
-
-  let isStart = true;
-  for (let i = 0; i < indices.length; i++) {
-    if (isStart) {
-      const blockInfo = {
-        index: i,
-        file_name: "",
-        section: "",
-        content: "",
-        type: "",
-        is_complete: false
-      };
-
-      // Check for file name in preceding line
-      const precedingText = text.slice(0, indices[i]).trim().split('\n');
-      if (precedingText.length > 0) {
-        const lastLine = precedingText[precedingText.length - 1].trim();
-        if (lastLine.startsWith("<file_name>") && lastLine.endsWith("</file_name>")) {
-          blockInfo.file_name = lastLine.slice("<file_name>".length, -"</file_name>".length).trim();
-        } else if (lastLine.startsWith("## filename:")) {
-          blockInfo.file_name = lastLine.slice("## filename:".length).trim();
-        }
-        if (lastLine.startsWith("<section>") && lastLine.endsWith("</section>")) {
-          blockInfo.section = lastLine.slice("<section>".length, -"</section>".length).trim();
-        }
-      }
-
-      const subText = text.slice(indices[i] + 3);
-      if (subText.length > 0) {
-        const findSpace = subText.indexOf(" ");
-        const findReturn = subText.indexOf("\n");
-        let nextIndex = Math.min(findSpace === -1 ? Infinity : findSpace, findReturn === -1 ? Infinity : findReturn);
-        if (subText.slice(0, nextIndex).includes('{')) {
-          nextIndex = 0;
-        }
-        const startPos = nextIndex;
-
-        if (text[indices[i] + 3] === "\n" || text[indices[i] + 3] === " " || text[indices[i] + 3] === "\t") {
-          blockInfo.type = 'language-specific';
-        } else {
-          blockInfo.type = subText.slice(0, nextIndex);
-        }
-
-        if (i + 1 < indices.length) {
-          const nextPos = indices[i + 1] - indices[i];
-          if (nextPos - 3 < subText.length && subText[nextPos - 3] === "`") {
-            blockInfo.content = subText.slice(startPos, nextPos - 3).trim();
-            blockInfo.is_complete = true;
-          } else {
-            blockInfo.content = subText.slice(startPos, nextPos).trim();
-            blockInfo.is_complete = false;
-          }
-        } else {
-          blockInfo.content = subText.slice(startPos).trim();
-          blockInfo.is_complete = false;
-        }
-
-        codeBlocks.push(blockInfo);
-      }
-      isStart = false;
-    } else {
-      isStart = true;
-    }
-  }
-
-  return codeBlocks;
-}
-
-
 /**
  * Updates the given code based on the provided query string.
  * The query string can contain two types of modifications:
@@ -1512,8 +1656,13 @@ class LOLLMSRAGClient {
         },
         body: body ? JSON.stringify(body) : null,
       };
-
-      const response = await fetch(`${this.lc.host_address}${endpoint}`, options);
+      let response ="";
+      if (this.lc.host_address!=null){
+        response = await fetch(`${this.lc.host_address}${endpoint}`, options);
+      }
+      else{
+        response = await fetch(`${endpoint}`, options);        
+      }
       const data = await response.json();
 
       if (!response.ok) {
